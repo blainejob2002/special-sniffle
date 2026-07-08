@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <style>
   html, body { margin: 0; padding: 0; }
   @keyframes radar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -205,6 +206,64 @@ function Inert() {
   }, []);
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  // Compress photos so they fit serverless limits (max ~1280px, jpeg)
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1280;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          const dataUrl = c.toDataURL("image/jpeg", 0.82);
+          resolve({ data: dataUrl.split(",")[1], mediaType: "image/jpeg", preview: dataUrl });
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // Try to decode a 1D barcode (EAN/UPC) from a data URL using Quagga
+  const decodeBarcodeStill = (dataUrl) =>
+    new Promise((resolve) => {
+      if (!window.Quagga) return resolve(null);
+      window.Quagga.decodeSingle({
+        src: dataUrl, numOfWorkers: 0, locate: true,
+        inputStream: { size: 1280 },
+        decoder: { readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader"] },
+      }, (res) => resolve(res && res.codeResult ? res.codeResult.code : null));
+    });
+
+  // Look a barcode up in Open Food Facts (free community DB, UK & US coverage)
+  const lookupBarcode = async (code) => {
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+      const d = await r.json();
+      if (d && d.status === 1 && d.product) {
+        const p = d.product;
+        return `Product database match for barcode ${code}: name: ${p.product_name || "unknown"}; brand: ${p.brands || "unknown"}; ingredients: ${p.ingredients_text || "not listed"}; packaging: ${p.packaging || "not listed"}; categories: ${p.categories || ""}`;
+      }
+    } catch (e) { console.warn("OFF lookup failed", e); }
+    return null;
+  };
+
+  const handleCode = async (code) => {
+    setDecoded(code);
+    const isDigits = /^\d{8,14}$/.test(code);
+    if (isDigits) {
+      const info = await lookupBarcode(code);
+      analyse({ text: info || `Barcode number ${code} (not found in product database)` });
+    } else {
+      analyse({ text: code });
+    }
+  };
+
   const analyse = async ({ text, img } = {}) => {
     setLoading(true); setError(null); setResult(null);
     try {
@@ -234,14 +293,34 @@ function Inert() {
       await video.play();
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      const tick = () => {
+      const detector = ("BarcodeDetector" in window)
+        ? new window.BarcodeDetector({ formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e"] })
+        : null;
+      let busy = false, lastQuagga = 0;
+      const tick = async () => {
         if (!streamRef.current) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video.readyState === video.HAVE_ENOUGH_DATA && !busy) {
           canvas.width = video.videoWidth; canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
-          if (code && code.data) { stopCamera(); setDecoded(code.data); analyse({ text: code.data }); return; }
+          if (detector) {
+            busy = true;
+            try {
+              const codes = await detector.detect(canvas);
+              if (codes && codes.length && codes[0].rawValue) { stopCamera(); handleCode(codes[0].rawValue); return; }
+            } catch (e) {}
+            busy = false;
+          } else {
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+            if (code && code.data) { stopCamera(); handleCode(code.data); return; }
+            const now = Date.now();
+            if (now - lastQuagga > 600) {
+              lastQuagga = now; busy = true;
+              const bar = await decodeBarcodeStill(canvas.toDataURL("image/jpeg", 0.7));
+              busy = false;
+              if (bar) { stopCamera(); handleCode(bar); return; }
+            }
+          }
         }
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -253,40 +332,41 @@ function Inert() {
     }
   };
 
-  const onFile = (e) => {
+  const onFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null); setResult(null); setDecoded(null);
-    const reader = new FileReader();
-    reader.onload = () => setImage({ data: reader.result.split(",")[1], mediaType: file.type || "image/jpeg", preview: reader.result });
-    reader.onerror = () => setError("couldn't read that photo — try another.");
-    reader.readAsDataURL(file);
+    try { setImage(await compressImage(file)); }
+    catch { setError("couldn't read that photo — try another."); }
   };
 
-  const onQRFile = (e) => {
+  const onQRFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null); setResult(null); setDecoded(null);
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      const compressed = await compressImage(file);
+      // 1) try QR
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         canvas.width = img.width; canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
         const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = window.jsQR(d.data, d.width, d.height);
-        if (code && code.data) { setDecoded(code.data); analyse({ text: code.data }); }
-        else {
-          const data = reader.result.split(",")[1];
-          setImage({ data, mediaType: file.type || "image/jpeg", preview: reader.result });
-          analyse({ img: { data, mediaType: file.type || "image/jpeg" } });
-        }
+        const qr = window.jsQR(d.data, d.width, d.height);
+        if (qr && qr.data) return handleCode(qr.data);
+        // 2) try barcode
+        const bar = await decodeBarcodeStill(compressed.preview);
+        if (bar) return handleCode(bar);
+        // 3) let the vision model read it
+        setImage(compressed);
+        analyse({ img: compressed });
       };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+      img.src = compressed.preview;
+    } catch {
+      setError("couldn't read that image — try a closer, sharper shot of the code.");
+    }
   };
 
   const reset = () => { stopCamera(); setImage(null); setResult(null); setError(null); setDecoded(null);
@@ -410,7 +490,7 @@ function Inert() {
                           <div style={{ position: "absolute", inset: "calc(50% - 3px)", width: 6, height: 6, borderRadius: "50%", background: T.teal, boxShadow: `0 0 10px ${T.tealGlow}` }} />
                         </div>
                         <div style={{ color: "#7BB8AE", fontSize: 13, letterSpacing: "0.08em", fontFamily: display, fontWeight: 600 }}>
-                          scanner on standby
+                          scanner on standby · barcodes + qr
                         </div>
                       </div>
                     )}
@@ -430,7 +510,7 @@ function Inert() {
                     </Btn>
                   </div>
                   <div style={{ fontSize: 12, color: T.soft, marginTop: 11, textAlign: "center" }}>
-                    live scanner blocked on your device? "snap the code" decodes from a photo. standard barcodes work via UPLOAD.
+                    reads product barcodes and qr codes, matched against the open food facts database. scanner blocked? "snap the code" works from a photo.
                   </div>
                 </React.Fragment>
               )}

@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="only light" />
+<meta name="theme-color" content="#F4EFE2" />
+<title>inert. — beyond the label</title>
+<meta name="description" content="Scan any product. See what leaches. Purity scored out of 100." />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  :root { color-scheme: only light; }
+  html, body { margin: 0; padding: 0; background: #F4EFE2; }
+  @keyframes radar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes rise { 0% { transform: translateY(14px); opacity: 0; } 30% { opacity: 1; } 70% { opacity: 1; } 100% { transform: translateY(-16px); opacity: 0; } }
+  @keyframes ping { 0% { transform: scale(0.6); opacity: 0.9; } 80% { transform: scale(2.1); opacity: 0; } 100% { transform: scale(2.1); opacity: 0; } }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(22px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes sectionIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.22); } }
+  @keyframes botJump { 0%, 100% { transform: translateY(0) scaleY(1); } 30% { transform: translateY(2px) scaleY(0.94); } 55% { transform: translateY(-16px) scaleY(1.04); } 80% { transform: translateY(0) scaleY(0.98); } }
+  @keyframes botBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes botDrama { 0%, 100% { transform: rotate(0deg); } 15% { transform: rotate(-8deg) translateX(-3px); } 30% { transform: rotate(7deg) translateX(3px); } 45% { transform: rotate(-6deg); } 60% { transform: rotate(5deg); } 75% { transform: rotate(-3deg); } }
+  @keyframes botTilt { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(6deg); } }
+  @keyframes armJoyL { 0%, 100% { transform: rotate(-130deg); } 50% { transform: rotate(-155deg); } }
+  @keyframes armJoyR { 0%, 100% { transform: rotate(130deg); } 50% { transform: rotate(155deg); } }
+  @keyframes antennaBoing { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-14deg); } 60% { transform: rotate(10deg); } }
+  .card-in { animation: cardIn 520ms cubic-bezier(.22,1,.36,1) both; }
+  .stagger > * { animation: sectionIn 480ms cubic-bezier(.22,1,.36,1) both; }
+  .stagger > *:nth-child(1) { animation-delay: 60ms; } .stagger > *:nth-child(2) { animation-delay: 130ms; }
+  .stagger > *:nth-child(3) { animation-delay: 200ms; } .stagger > *:nth-child(4) { animation-delay: 270ms; }
+  .stagger > *:nth-child(5) { animation-delay: 340ms; } .stagger > *:nth-child(6) { animation-delay: 410ms; }
+  .stagger > *:nth-child(7) { animation-delay: 480ms; } .stagger > *:nth-child(8) { animation-delay: 550ms; }
+  @media (prefers-reduced-motion: reduce) { .radar-sweep, .rise-chev, .ping-ring, .card-in, .stagger > *, .bot, .bot * { animation: none !important; opacity: 1 !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const T = {
+  bg: "#F4EFE2", panel: "#FBF7EC", ink: "#22302E", soft: "#7E8A85",
+  teal: "#17A398", tealDeep: "#0E7C74", tealGlow: "rgba(23,163,152,0.45)",
+  cherry: "#D8433F", cherryGlow: "rgba(216,67,63,0.45)",
+  butter: "#E08A1E", butterGlow: "rgba(224,138,30,0.45)",
+  green: "#2FA24B", greenGlow: "rgba(47,162,75,0.45)",
+  pine: "#14682F", pineGlow: "rgba(20,104,47,0.5)",
+  chrome: "conic-gradient(from 210deg, #C9CBC6, #FDFDFB 18%, #AEB2AD 38%, #F2F3EF 58%, #B8BBB6 78%, #C9CBC6)",
+};
+const display = "'Futura', 'Century Gothic', 'Avenir Next', 'Trebuchet MS', sans-serif";
+const body = "'Avenir Next', 'Futura', 'Century Gothic', system-ui, sans-serif";
+const raise = (r = 24) => ({
+  background: `linear-gradient(150deg, #FFFEF8, ${T.panel} 55%, #F0EADA)`, borderRadius: r,
+  boxShadow: "9px 9px 22px rgba(34,48,46,0.13), -6px -6px 16px rgba(255,255,255,0.95), inset 0 1.5px 0 rgba(255,255,255,0.95)",
+  border: "1px solid rgba(255,255,255,0.65)",
+});
+const recess = (r = 14) => ({
+  background: "linear-gradient(150deg, #E7E1D1, #F5F0E2)", borderRadius: r,
+  boxShadow: "inset 3px 3px 8px rgba(34,48,46,0.14), inset -2px -2px 6px rgba(255,255,255,0.95)",
+});
+const scoreColor = (s) => (s == null ? T.soft : s >= 80 ? T.pine : s >= 60 ? T.green : s >= 40 ? T.butter : T.cherry);
+const scoreGlow = (s) => (s == null ? "transparent" : s >= 80 ? T.pineGlow : s >= 60 ? T.greenGlow : s >= 40 ? T.butterGlow : T.cherryGlow);
+
+function Starburst({ size = 60, color = T.teal, style }) {
+  const cx = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={style}>
+      {Array.from({ length: 8 }).map((_, i) => {
+        const a = (i / 8) * Math.PI * 2;
+        const long = i % 2 === 0;
+        const len = long ? cx - 3 : cx * 0.58;
+        return (
+          <g key={i}>
+            <line x1={cx} y1={cx} x2={cx + Math.cos(a) * len} y2={cx + Math.sin(a) * len}
+              stroke={color} strokeWidth={size * 0.035} strokeLinecap="round" />
+            <circle cx={cx + Math.cos(a) * len} cy={cx + Math.sin(a) * len} r={size * 0.045} fill={color} />
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cx} r={size * 0.09} fill={color} />
+    </svg>
+  );
+}
+
+function Emblem({ size = 64 }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: T.chrome,
+      boxShadow: "5px 5px 12px rgba(34,48,46,0.2), -4px -4px 10px rgba(255,255,255,0.95)",
+      display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: size * 0.76, height: size * 0.76, borderRadius: "50%", ...recess(999), display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Starburst size={size * 0.5} />
+      </div>
+    </div>
+  );
+}
+
+// Modern severity indicator: live pulse ring — fast red for high, slow amber for medium, still dot for low
+function PulseDot({ color, glow, speed, size = 10 }) {
+  return (
+    <span style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
+      {speed && (
+        <span className="ping-ring" style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: `1.5px solid ${color}`,
+          animation: `ping ${speed}s cubic-bezier(0, 0, 0.2, 1) infinite`,
+        }} />
+      )}
+      <span style={{
+        position: "absolute", inset: 0, borderRadius: "50%", background: color,
+        boxShadow: speed ? `0 0 8px ${glow}` : "none",
+      }} />
+    </span>
+  );
+}
+
+// ── ATOM — the inert. mascot ──
+// moods: "joy" (EXCELLENT), "happy" (GOOD), "wary" (CAUTION), "drama" (AVOID)
+function Atom({ mood = "happy", size = 120 }) {
+  const bodyAnim = mood === "joy" ? "botJump 0.9s ease-in-out infinite"
+    : mood === "drama" ? "botDrama 1.4s ease-in-out infinite"
+    : mood === "wary" ? "botTilt 2.6s ease-in-out infinite"
+    : "botBob 2.2s ease-in-out infinite";
+  const armL = mood === "joy" ? { anim: "armJoyL 0.9s ease-in-out infinite", rot: -130 }
+    : mood === "drama" ? { anim: "none", rot: -205 }
+    : mood === "wary" ? { anim: "none", rot: -195 }
+    : { anim: "none", rot: -35 };
+  const armR = mood === "joy" ? { anim: "armJoyR 0.9s ease-in-out infinite", rot: 130 }
+    : mood === "drama" ? { anim: "none", rot: 205 }
+    : mood === "wary" ? { anim: "none", rot: 30 }
+    : { anim: "none", rot: 140 };
+  const eyeColor = mood === "drama" ? T.cherry : "#6FE3D6";
+  const dialCol = mood === "drama" ? T.cherry : mood === "wary" ? T.butter : T.green;
+  const dialGlow = mood === "drama" ? T.cherryGlow : mood === "wary" ? T.butterGlow : T.greenGlow;
+  return (
+    <svg className="bot" width={size} height={size} viewBox="0 0 120 126" style={{ overflow: "visible" }}>
+      <defs>
+        <linearGradient id="atomChrome" x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0%" stopColor="#FBFCFA" /><stop offset="30%" stopColor="#DFE1DD" />
+          <stop offset="55%" stopColor="#B9BDB8" /><stop offset="75%" stopColor="#E4E6E2" />
+          <stop offset="100%" stopColor="#A6ABA6" />
+        </linearGradient>
+        <radialGradient id="atomHead" cx="0.35" cy="0.28" r="1">
+          <stop offset="0%" stopColor="#FFFFFF" /><stop offset="35%" stopColor="#E4E6E2" />
+          <stop offset="72%" stopColor="#BFC3BE" /><stop offset="100%" stopColor="#9CA19C" />
+        </radialGradient>
+        <linearGradient id="atomVisor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1E3A34" /><stop offset="45%" stopColor="#0C1C18" />
+          <stop offset="100%" stopColor="#071210" />
+        </linearGradient>
+        <radialGradient id="atomHand" cx="0.35" cy="0.3" r="1">
+          <stop offset="0%" stopColor="#F4F5F2" /><stop offset="70%" stopColor="#C4C8C3" />
+          <stop offset="100%" stopColor="#A3A8A3" />
+        </radialGradient>
+        <linearGradient id="atomLimb" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#D6D9D4" /><stop offset="45%" stopColor="#AEB3AE" />
+          <stop offset="100%" stopColor="#8F958F" />
+        </linearGradient>
+      </defs>
+
+      {/* ground shadow */}
+      <ellipse cx="60" cy="120" rx="30" ry="5" fill="rgba(34,48,46,0.16)" />
+
+      <g style={{ animation: bodyAnim, transformOrigin: "60px 100px" }}>
+        {/* antenna */}
+        <g style={{ animation: "antennaBoing 1.6s ease-in-out infinite", transformOrigin: "60px 25px" }}>
+          <path d="M60 25 Q59 17 60 11" fill="none" stroke="url(#atomLimb)" strokeWidth="2.6" strokeLinecap="round" />
+          <circle cx="60" cy="8" r="4.6" fill={T.cherry} style={{ filter: `drop-shadow(0 0 6px ${T.cherryGlow})` }} />
+          <circle cx="58.6" cy="6.6" r="1.5" fill="rgba(255,255,255,0.75)" />
+        </g>
+
+        {/* head */}
+        <ellipse cx="60" cy="42" rx="25" ry="20" fill="url(#atomHead)" />
+        <ellipse cx="60" cy="42" rx="25" ry="20" fill="none" stroke="rgba(90,98,92,0.45)" strokeWidth="1" />
+        {/* head shine */}
+        <ellipse cx="50" cy="32" rx="10" ry="5.5" fill="rgba(255,255,255,0.65)" transform="rotate(-18 50 32)" />
+        {/* ear bolts */}
+        <circle cx="34.5" cy="42" r="3.6" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+        <circle cx="85.5" cy="42" r="3.6" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+
+        {/* visor */}
+        <rect x="43" y="33.5" width="34" height="16.5" rx="8.25" fill="url(#atomVisor)" />
+        <rect x="43" y="33.5" width="34" height="16.5" rx="8.25" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
+        {/* visor glare */}
+        <path d="M47 37 Q56 34.5 66 36" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="2.2" strokeLinecap="round" />
+
+        {/* eyes */}
+        {mood === "drama" ? (
+          <g stroke={eyeColor} strokeWidth="2.4" strokeLinecap="round" style={{ filter: `drop-shadow(0 0 3px ${T.cherryGlow})` }}>
+            <line x1="50" y1="39" x2="55" y2="44" /><line x1="55" y1="39" x2="50" y2="44" />
+            <line x1="65" y1="39" x2="70" y2="44" /><line x1="70" y1="39" x2="65" y2="44" />
+          </g>
+        ) : mood === "joy" ? (
+          <g stroke={eyeColor} strokeWidth="2.7" strokeLinecap="round" fill="none" style={{ filter: `drop-shadow(0 0 4px ${T.tealGlow})` }}>
+            <path d="M49 43.5 Q52.5 37.5 56 43.5" /><path d="M64 43.5 Q67.5 37.5 71 43.5" />
+          </g>
+        ) : mood === "wary" ? (
+          <g fill={eyeColor} style={{ filter: `drop-shadow(0 0 3px ${T.tealGlow})` }}>
+            <rect x="50" y="40.5" width="6.5" height="2.8" rx="1.4" />
+            <rect x="63.5" y="39" width="6.5" height="2.8" rx="1.4" />
+          </g>
+        ) : (
+          <g fill={eyeColor} style={{ filter: `drop-shadow(0 0 4px ${T.tealGlow})` }}>
+            <circle cx="53" cy="41.8" r="3.2" /><circle cx="67" cy="41.8" r="3.2" />
+            <circle cx="52" cy="40.8" r="1" fill="rgba(255,255,255,0.8)" />
+            <circle cx="66" cy="40.8" r="1" fill="rgba(255,255,255,0.8)" />
+          </g>
+        )}
+
+        {/* neck */}
+        <rect x="54" y="60" width="12" height="6.5" rx="3" fill="url(#atomLimb)" />
+
+        {/* body */}
+        <rect x="38.5" y="64.5" width="43" height="35" rx="14" fill="url(#atomChrome)" />
+        <rect x="38.5" y="64.5" width="43" height="35" rx="14" fill="none" stroke="rgba(90,98,92,0.45)" strokeWidth="1" />
+        {/* body shine */}
+        <path d="M45 70 Q44 82 46 92" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="3.2" strokeLinecap="round" />
+        {/* rivets */}
+        <circle cx="45.5" cy="94" r="1.4" fill="rgba(90,98,92,0.5)" />
+        <circle cx="74.5" cy="94" r="1.4" fill="rgba(90,98,92,0.5)" />
+
+        {/* chest dial */}
+        <circle cx="60" cy="81" r="9.5" fill="url(#atomHand)" stroke="rgba(90,98,92,0.45)" strokeWidth="0.8" />
+        <circle cx="60" cy="81" r="7.4" fill="#0C1C18" />
+        <circle cx="60" cy="81" r="5" fill="none" stroke={dialCol} strokeWidth="2"
+          strokeDasharray={mood === "drama" ? "3 6" : mood === "wary" ? "16 16" : "32 0"}
+          style={{ filter: `drop-shadow(0 0 4px ${dialGlow})` }} />
+
+        {/* arms */}
+        <g style={{ transformOrigin: "41px 70px", transform: `rotate(${armL.rot}deg)`, animation: armL.anim }}>
+          <rect x="38.2" y="69" width="5.8" height="20" rx="2.9" fill="url(#atomLimb)" />
+          <circle cx="41" cy="91" r="4.6" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+        </g>
+        <g style={{ transformOrigin: "79px 70px", transform: `rotate(${armR.rot}deg)`, animation: armR.anim }}>
+          <rect x="76" y="69" width="5.8" height="20" rx="2.9" fill="url(#atomLimb)" />
+          <circle cx="79" cy="91" r="4.6" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+        </g>
+
+        {/* legs */}
+        <rect x="47.5" y="97" width="6.5" height="15" rx="3.25" fill="url(#atomLimb)" />
+        <rect x="66" y="97" width="6.5" height="15" rx="3.25" fill="url(#atomLimb)" />
+        {/* feet */}
+        <ellipse cx="50" cy="113.5" rx="8.5" ry="4" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+        <ellipse cx="70" cy="113.5" rx="8.5" ry="4" fill="url(#atomHand)" stroke="rgba(90,98,92,0.4)" strokeWidth="0.8" />
+        <ellipse cx="48" cy="112" rx="3" ry="1.2" fill="rgba(255,255,255,0.55)" />
+        <ellipse cx="68" cy="112" rx="3" ry="1.2" fill="rgba(255,255,255,0.55)" />
+      </g>
+    </svg>
+  );
+}
+
+function Jewel({ color, glow, on = true, size = 12, breathe = false }) {
+  return (
+    <span style={{ width: size, height: size, borderRadius: "50%", display: "inline-block",
+      animation: breathe && on ? "breathe 2.4s ease-in-out infinite" : "none",
+      background: on ? `radial-gradient(circle at 34% 30%, #fff9, ${color} 55%, ${color})` : "radial-gradient(circle at 34% 30%, #fff8, #B9B4A6 60%)",
+      boxShadow: on ? `0 0 10px ${glow}, inset 0 -1.5px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(255,255,255,0.8)` : "inset 0 -1.5px 2px rgba(0,0,0,0.25)",
+      border: "1px solid rgba(34,48,46,0.25)" }} />
+  );
+}
+
+function Gauge({ score }) {
+  const size = 244, r = 86, cx = size / 2;
+  const target = Math.max(0, Math.min(100, score));
+  const [pct, setPct] = React.useState(0);
+  useEffect(() => {
+    // sweep the needle up from zero
+    const t0 = performance.now(), dur = 1400;
+    let raf;
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      // spring overshoot: swings slightly past then settles
+      const c = 1.70158 * 0.9;
+      const ease = 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+      setPct(Math.max(0, Math.min(100, Math.round(target * ease))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  const col = scoreColor(target), glow = scoreGlow(target);
+  const start = 0.75 * Math.PI, sweep = 1.5 * Math.PI;
+  const needleA = start + (pct / 100) * sweep;
+  const arc = (from, to, radius) => {
+    const x1 = cx + Math.cos(from) * radius, y1 = cx + Math.sin(from) * radius;
+    const x2 = cx + Math.cos(to) * radius, y2 = cx + Math.sin(to) * radius;
+    const large = to - from > Math.PI ? 1 : 0;
+    return `M ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2}`;
+  };
+  return (
+    <div style={{ position: "relative", width: size, height: size, margin: "0 auto" }}>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: T.chrome,
+        boxShadow: "10px 10px 24px rgba(34,48,46,0.18), -8px -8px 20px rgba(255,255,255,0.95)" }} />
+      <div style={{ position: "absolute", inset: 13, borderRadius: "50%",
+        background: "radial-gradient(circle at 38% 30%, #FFFDF4, #F1EBDA 70%)",
+        boxShadow: "inset 4px 4px 10px rgba(34,48,46,0.14), inset -3px -3px 8px rgba(255,255,255,0.95)" }} />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute", inset: 0 }}>
+        {Array.from({ length: 31 }).map((_, i) => {
+          const a = start + (i / 30) * sweep;
+          const major = i % 5 === 0;
+          const r1 = r + 13, r2 = r + (major ? 4 : 9);
+          return (
+            <line key={i} x1={cx + Math.cos(a) * r1} y1={cx + Math.sin(a) * r1}
+              x2={cx + Math.cos(a) * r2} y2={cx + Math.sin(a) * r2}
+              stroke={major ? "#8E978F" : "#C8C4B4"} strokeWidth={major ? 2.2 : 1.1} strokeLinecap="round" />
+          );
+        })}
+        <path d={arc(start, start + sweep, r)} fill="none" stroke="#DCD6C4" strokeWidth="8" strokeLinecap="round" />
+        <path d={arc(start, needleA, r)} fill="none" stroke={col} strokeWidth="8" strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 6px ${glow})` }} />
+        <g style={{ transform: `rotate(${(needleA * 180) / Math.PI - 90}deg)`, transformOrigin: `${cx}px ${cx}px` }}>
+          <line x1={cx} y1={cx + 14} x2={cx} y2={cx - r + 16} stroke={T.cherry} strokeWidth="3.5" strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 4px ${T.cherryGlow})` }} />
+        </g>
+        <circle cx={cx} cy={cx} r="11" fill="url(#hub)" stroke="#9AA09A" strokeWidth="1" />
+        <defs>
+          <radialGradient id="hub" cx="35%" cy="30%">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="60%" stopColor="#C9CBC6" />
+            <stop offset="100%" stopColor="#9AA09A" />
+          </radialGradient>
+        </defs>
+      </svg>
+      <div style={{ position: "absolute", inset: 13, borderRadius: "50%", pointerEvents: "none",
+        background: "linear-gradient(150deg, rgba(255,255,255,0.6), rgba(255,255,255,0) 42%)" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 40, textAlign: "center" }}>
+        <div style={{ fontFamily: display, fontSize: 46, fontWeight: 700, letterSpacing: "-0.02em", color: col, lineHeight: 1, textShadow: `0 0 14px ${glow}` }}>
+          {pct}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Btn({ children, onClick, primary, disabled, style }) {
+  const [down, setDown] = useState(false);
+  return (
+    <button onClick={onClick} disabled={disabled}
+      onPointerDown={() => setDown(true)} onPointerUp={() => setDown(false)} onPointerLeave={() => setDown(false)}
+      style={{
+        fontFamily: display, padding: "15px 18px", borderRadius: 999, fontSize: 13.5, fontWeight: 700,
+        letterSpacing: "0.08em", textTransform: "lowercase", cursor: disabled ? "default" : "pointer",
+        border: "1px solid rgba(255,255,255,0.55)", color: primary ? "#FFFDF4" : T.ink,
+        background: primary
+          ? `linear-gradient(160deg, ${disabled ? "#93A5A0" : "#1FBFB2"}, ${disabled ? "#77877F" : T.tealDeep})`
+          : "linear-gradient(150deg, #FFFEF8, #EFE9D8)",
+        boxShadow: down
+          ? "inset 3px 3px 8px rgba(34,48,46,0.24), inset -2px -2px 6px rgba(255,255,255,0.25)"
+          : primary
+            ? `5px 5px 14px rgba(34,48,46,0.2), -3px -3px 10px rgba(255,255,255,0.75), inset 0 1.5px 0 rgba(255,255,255,0.4), 0 0 18px ${disabled ? "transparent" : "rgba(23,163,152,0.3)"}`
+            : "5px 5px 14px rgba(34,48,46,0.14), -4px -4px 10px rgba(255,255,255,0.9), inset 0 1.5px 0 rgba(255,255,255,0.95)",
+        transform: down ? "translateY(1px)" : "none",
+        transition: "box-shadow 120ms ease, transform 120ms ease", ...style,
+      }}>
+      {children}
+    </button>
+  );
+}
+
+const sev = {
+  high: { label: "HIGH RISK", color: T.cherry, glow: T.cherryGlow, speed: 1.2 },
+  medium: { label: "MODERATE", color: T.butter, glow: T.butterGlow, speed: 2.2 },
+  low: { label: "LOW", color: T.soft, glow: "transparent", speed: null },
+};
+
+function Block({ label, children }) {
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontFamily: display, fontSize: 10.5, letterSpacing: "0.24em", color: T.soft, fontWeight: 800, textTransform: "uppercase", marginBottom: 11 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function Inert() {
+  const [region, setRegion] = useState("UK");
+  const [mode, setMode] = useState("photo");
+  const [image, setImage] = useState(null);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [decoded, setDecoded] = useState(null);
+  const fileRef = useRef(null);
+  const camRef = useRef(null);
+  const qrFileRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  const stopCamera = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    setScanning(false);
+  }, []);
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  // Compress photos so they fit serverless limits (max ~1280px, jpeg)
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1100;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          const dataUrl = c.toDataURL("image/jpeg", 0.82);
+          resolve({ data: dataUrl.split(",")[1], mediaType: "image/jpeg", preview: dataUrl });
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // Try to decode a 1D barcode (EAN/UPC) from a data URL using Quagga
+  const decodeBarcodeStill = (dataUrl) =>
+    new Promise((resolve) => {
+      if (!window.Quagga) return resolve(null);
+      window.Quagga.decodeSingle({
+        src: dataUrl, numOfWorkers: 0, locate: true,
+        inputStream: { size: 1280 },
+        decoder: { readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader"] },
+      }, (res) => resolve(res && res.codeResult ? res.codeResult.code : null));
+    });
+
+  // Look a barcode up in Open Food Facts (free community DB, UK & US coverage)
+  const lookupBarcode = async (code) => {
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+      const d = await r.json();
+      if (d && d.status === 1 && d.product) {
+        const p = d.product;
+        const n = p.nutriments || {};
+        const nut = `nutrition per 100g: protein ${n.proteins_100g ?? "?"}g, sugars ${n.sugars_100g ?? "?"}g, salt ${n.salt_100g ?? "?"}g, fat ${n.fat_100g ?? "?"}g, energy ${n["energy-kcal_100g"] ?? "?"}kcal`;
+        return `Product database match for barcode ${code}: name: ${p.product_name || "unknown"}; brand: ${p.brands || "unknown"}; ingredients: ${p.ingredients_text || "not listed"}; ${nut}; packaging: ${p.packaging || "not listed"}; categories: ${p.categories || ""}`;
+      }
+    } catch (e) { console.warn("OFF lookup failed", e); }
+    return null;
+  };
+
+  const handleCode = async (code) => {
+    setDecoded(code);
+    const isDigits = /^\d{8,14}$/.test(code);
+    if (isDigits) {
+      const info = await lookupBarcode(code);
+      analyse({ text: info || `Barcode number ${code} (not found in product database)` });
+    } else {
+      analyse({ text: code });
+    }
+  };
+
+  const analyse = async ({ text, img } = {}) => {
+    setLoading(true); setError(null); setResult(null);
+    try {
+      const pic = img || image;
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(text ? { region, text } : { region, image: { data: pic.data, mediaType: pic.mediaType } }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "API error");
+      setResult(data);
+    } catch (e) {
+      console.error(e);
+      setError("analysis failed — try again with a clearer photo or rescan the code.");
+    } finally { setLoading(false); }
+  };
+
+  const startQR = async () => {
+    setError(null); setResult(null); setDecoded(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      setScanning(true);
+      const video = videoRef.current;
+      video.srcObject = stream;
+      await video.play();
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const detector = ("BarcodeDetector" in window)
+        ? new window.BarcodeDetector({ formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e"] })
+        : null;
+      let busy = false, lastQuagga = 0;
+      const tick = async () => {
+        if (!streamRef.current) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA && !busy) {
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          if (detector) {
+            busy = true;
+            try {
+              const codes = await detector.detect(canvas);
+              if (codes && codes.length && codes[0].rawValue) { stopCamera(); handleCode(codes[0].rawValue); return; }
+            } catch (e) {}
+            busy = false;
+          } else {
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+            if (code && code.data) { stopCamera(); handleCode(code.data); return; }
+            const now = Date.now();
+            if (now - lastQuagga > 600) {
+              lastQuagga = now; busy = true;
+              const bar = await decodeBarcodeStill(canvas.toDataURL("image/jpeg", 0.7));
+              busy = false;
+              if (bar) { stopCamera(); handleCode(bar); return; }
+            }
+          }
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch (e) {
+      console.error(e);
+      stopCamera();
+      setError("camera unavailable — allow camera access, or use snap the code instead.");
+    }
+  };
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null); setResult(null); setDecoded(null);
+    try { setImage(await compressImage(file)); }
+    catch { setError("couldn't read that photo — try another."); }
+  };
+
+  const onQRFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null); setResult(null); setDecoded(null);
+    try {
+      const compressed = await compressImage(file);
+      // 1) try QR
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        canvas.width = img.width; canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qr = window.jsQR(d.data, d.width, d.height);
+        if (qr && qr.data) return handleCode(qr.data);
+        // 2) try barcode
+        const bar = await decodeBarcodeStill(compressed.preview);
+        if (bar) return handleCode(bar);
+        // 3) let the vision model read it
+        setImage(compressed);
+        analyse({ img: compressed });
+      };
+      img.src = compressed.preview;
+    } catch {
+      setError("couldn't read that image — try a closer, sharper shot of the code.");
+    }
+  };
+
+  // ── SHARE CARD: renders a 1080x1920 retro story image of the verdict ──
+  const shareCard = async () => {
+    if (!result) return;
+    try {
+    const W = 1080, H = 1920;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const x = c.getContext("2d");
+    // compatible rounded rect (roundRect isn't supported on all phone browsers)
+    const rr = (rx, ry, rw, rh, rad) => {
+      x.beginPath();
+      x.moveTo(rx + rad, ry);
+      x.arcTo(rx + rw, ry, rx + rw, ry + rh, rad);
+      x.arcTo(rx + rw, ry + rh, rx, ry + rh, rad);
+      x.arcTo(rx, ry + rh, rx, ry, rad);
+      x.arcTo(rx, ry, rx + rw, ry, rad);
+      x.closePath();
+    };
+    const col = scoreColor(result.score);
+    const dsp = "700 __px Futura, 'Century Gothic', 'Trebuchet MS', sans-serif";
+    const font = (size, weight = 700) => dsp.replace("700", String(weight)).replace("__", String(size));
+
+    // cream backdrop with soft radial
+    const bgGrad = x.createRadialGradient(W * 0.25, -100, 100, W * 0.5, H * 0.4, H);
+    bgGrad.addColorStop(0, "#FBF7EA"); bgGrad.addColorStop(1, "#F0E9D6");
+    x.fillStyle = bgGrad; x.fillRect(0, 0, W, H);
+
+    // faint starbursts
+    const burst = (bx, by, r, colr) => {
+      x.strokeStyle = colr; x.fillStyle = colr; x.lineWidth = 5; x.lineCap = "round";
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2, len = i % 2 === 0 ? r : r * 0.58;
+        x.beginPath(); x.moveTo(bx, by); x.lineTo(bx + Math.cos(a) * len, by + Math.sin(a) * len); x.stroke();
+        x.beginPath(); x.arc(bx + Math.cos(a) * len, by + Math.sin(a) * len, 8, 0, 7); x.fill();
+      }
+    };
+    burst(W - 110, 240, 90, "rgba(23,163,152,0.14)");
+    burst(120, H - 420, 64, "rgba(216,67,63,0.12)");
+
+    // wordmark
+    x.fillStyle = "#22302E"; x.font = font(96); x.textAlign = "center";
+    x.fillText("inert", W / 2 - 18, 220);
+    x.fillStyle = "#17A398"; x.fillText(".", W / 2 + x.measureText("inert").width / 2 - 6, 220);
+    x.fillStyle = "#7E8A85"; x.font = font(30, 600);
+    x.save(); try { x.letterSpacing = "12px"; } catch (e) {} x.fillText("BEYOND THE LABEL", W / 2, 280); x.restore();
+
+    // gauge
+    const gx = W / 2, gy = 780, gr = 300;
+    x.fillStyle = "#EDE6D2"; x.beginPath(); x.arc(gx, gy, gr + 70, 0, 7); x.fill();
+    x.strokeStyle = "#DCD6C4"; x.lineWidth = 3; x.stroke();
+    x.fillStyle = "#FBF7EC"; x.beginPath(); x.arc(gx, gy, gr + 40, 0, 7); x.fill();
+    const start = 0.75 * Math.PI, sweep = 1.5 * Math.PI;
+    const pct = result.score == null ? 0 : Math.min(100, result.score);
+    // ticks
+    for (let i = 0; i <= 30; i++) {
+      const a = start + (i / 30) * sweep, major = i % 5 === 0;
+      const r1 = gr + 34, r2 = gr + (major ? 8 : 22);
+      x.strokeStyle = major ? "#8E978F" : "#C8C4B4"; x.lineWidth = major ? 6 : 3;
+      x.beginPath(); x.moveTo(gx + Math.cos(a) * r1, gy + Math.sin(a) * r1);
+      x.lineTo(gx + Math.cos(a) * r2, gy + Math.sin(a) * r2); x.stroke();
+    }
+    x.strokeStyle = "#DCD6C4"; x.lineWidth = 26; x.lineCap = "round";
+    x.beginPath(); x.arc(gx, gy, gr, start, start + sweep); x.stroke();
+    x.strokeStyle = col; x.shadowColor = col; x.shadowBlur = 30;
+    x.beginPath(); x.arc(gx, gy, gr, start, start + (pct / 100) * sweep); x.stroke();
+    x.shadowBlur = 0;
+    // needle
+    const na = start + (pct / 100) * sweep;
+    x.strokeStyle = "#D8433F"; x.lineWidth = 10;
+    x.beginPath(); x.moveTo(gx - Math.cos(na) * -40, gy - Math.sin(na) * -40);
+    x.lineTo(gx + Math.cos(na) * (gr - 50), gy + Math.sin(na) * (gr - 50)); x.stroke();
+    x.fillStyle = "#C9CBC6"; x.beginPath(); x.arc(gx, gy, 30, 0, 7); x.fill();
+    x.strokeStyle = "#9AA09A"; x.lineWidth = 3; x.stroke();
+    // score
+    x.fillStyle = col; x.font = font(170); x.shadowColor = col; x.shadowBlur = 40;
+    x.fillText(result.score == null ? "—" : String(result.score), gx, gy + gr - 40);
+    x.shadowBlur = 0;
+
+    // verdict
+    if (result.verdict) {
+      x.font = font(52); x.fillStyle = col;
+      x.save(); try { x.letterSpacing = "14px"; } catch (e) {} x.fillText(result.verdict, W / 2, gy + gr + 190); x.restore();
+    }
+
+    // ── Atom the mascot, posed by verdict ──
+    const drawAtom = (bx, by, s, mood) => {
+      x.save(); x.translate(bx, by); x.scale(s, s);
+      if (mood === "drama") { x.rotate(-0.12); }
+      const chrome = x.createLinearGradient(-30, -60, 30, 60);
+      chrome.addColorStop(0, "#F2F3EF"); chrome.addColorStop(0.45, "#C9CBC6");
+      chrome.addColorStop(0.7, "#E8E9E5"); chrome.addColorStop(1, "#AEB2AD");
+      // antenna
+      x.strokeStyle = "#9AA09A"; x.lineWidth = 2.5; x.lineCap = "round";
+      x.beginPath(); x.moveTo(0, -58); x.lineTo(0, -72); x.stroke();
+      x.fillStyle = "#D8433F"; x.beginPath(); x.arc(0, -75, 4.5, 0, 7); x.fill();
+      // head
+      x.fillStyle = chrome; x.beginPath(); x.ellipse(0, -42, 24, 19, 0, 0, 7); x.fill();
+      x.strokeStyle = "#9AA09A"; x.lineWidth = 1.5; x.stroke();
+      // visor
+      x.fillStyle = "#10201C"; rr(-16, -50, 32, 15, 7.5); x.fill();
+      // eyes
+      x.strokeStyle = mood === "drama" ? "#D8433F" : "#6FE3D6"; x.lineWidth = 2.5; x.lineCap = "round";
+      if (mood === "drama") {
+        [[-10, -3], [4, 11]].forEach(([a, b]) => {
+          x.beginPath(); x.moveTo(a, -46); x.lineTo(b - 1, -39); x.stroke();
+          x.beginPath(); x.moveTo(b - 1, -46); x.lineTo(a, -39); x.stroke();
+        });
+      } else if (mood === "joy") {
+        x.beginPath(); x.moveTo(-11, -40); x.quadraticCurveTo(-7.5, -47, -4, -40); x.stroke();
+        x.beginPath(); x.moveTo(4, -40); x.quadraticCurveTo(7.5, -47, 11, -40); x.stroke();
+      } else if (mood === "wary") {
+        x.fillStyle = "#6FE3D6"; x.fillRect(-11, -43, 6, 2.6); x.fillRect(4, -44.5, 6, 2.6);
+      } else {
+        x.fillStyle = "#6FE3D6";
+        x.beginPath(); x.arc(-7, -41, 3, 0, 7); x.fill();
+        x.beginPath(); x.arc(7, -41, 3, 0, 7); x.fill();
+      }
+      // neck + body
+      x.fillStyle = "#B8BBB6"; rr(-5, -24, 10, 6, 2); x.fill();
+      x.fillStyle = chrome; rr(-20, -18, 40, 34, 12); x.fill();
+      x.strokeStyle = "#9AA09A"; x.stroke();
+      // chest dial
+      x.fillStyle = "#10201C"; x.beginPath(); x.arc(0, -2, 8, 0, 7); x.fill();
+      x.strokeStyle = mood === "drama" ? "#D8433F" : mood === "wary" ? "#E08A1E" : "#2FA24B";
+      x.lineWidth = 2; x.beginPath(); x.arc(0, -2, 5.5, 0, mood === "drama" ? 1.5 : mood === "wary" ? 3.6 : 7); x.stroke();
+      // arms (angle from straight-down, per mood)
+      const armAngles = mood === "joy" ? [-2.4, 2.4] : mood === "drama" ? [-3.5, 3.5] : mood === "wary" ? [-3.3, 0.5] : [-0.6, 2.4];
+      x.strokeStyle = "#9AA09A"; x.lineWidth = 5;
+      armAngles.forEach((a, i) => {
+        const sx = i === 0 ? -18 : 18, sy = -12;
+        const ex = sx + Math.sin(a) * 18, ey = sy + Math.cos(a) * 18;
+        x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+        x.fillStyle = "#C9CBC6"; x.beginPath(); x.arc(ex, ey, 4, 0, 7); x.fill();
+      });
+      // legs + feet
+      x.lineWidth = 5.5;
+      x.beginPath(); x.moveTo(-9, 16); x.lineTo(-9, 28); x.stroke();
+      x.beginPath(); x.moveTo(9, 16); x.lineTo(9, 28); x.stroke();
+      x.fillStyle = "#B8BBB6";
+      x.beginPath(); x.ellipse(-10, 30, 7, 3.5, 0, 0, 7); x.fill();
+      x.beginPath(); x.ellipse(10, 30, 7, 3.5, 0, 0, 7); x.fill();
+      x.restore();
+    };
+    const cardMood = result.verdict === "EXCELLENT" ? "joy" : result.verdict === "GOOD" ? "happy" : result.verdict === "CAUTION" ? "wary" : "drama";
+    drawAtom(W - 170, 520, 1.9, cardMood);
+
+    // product name, wrapped
+    x.fillStyle = "#22302E"; x.font = font(58); x.textAlign = "center";
+    const words = (result.name || "").split(" ");
+    let line = "", lines = [];
+    for (const w of words) {
+      if (x.measureText(line + " " + w).width > W - 200 && line) { lines.push(line); line = w; }
+      else line = line ? line + " " + w : w;
+    }
+    lines.push(line);
+    lines.slice(0, 3).forEach((l, i) => x.fillText(l, W / 2, gy + gr + 300 + i * 74));
+
+    // footer
+    x.fillStyle = "#7E8A85"; x.font = font(34, 600);
+    x.fillText("scanned with inert.", W / 2, H - 160);
+    x.font = font(30, 600);
+    x.fillText(window.location.host || "inert", W / 2, H - 105);
+
+    // share or download
+    c.toBlob(async (blob) => {
+      if (!blob) { setError("couldn't build the share card — try again."); return; }
+      const file = new File([blob], "inert-scan.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: "inert. scan" }); return; } catch (e) {}
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "inert-scan.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }, "image/png");
+    } catch (e) {
+      console.error(e);
+      setError("share card failed on this browser — screenshot the result instead, and tell us your phone model.");
+    }
+  };
+
+  const reset = () => { stopCamera(); setImage(null); setResult(null); setError(null); setDecoded(null);
+    [fileRef, camRef, qrFileRef].forEach(r => { if (r.current) r.current.value = ""; }); };
+
+  return (
+    <div style={{ minHeight: "100vh", color: T.ink, fontFamily: body,
+      background: `radial-gradient(1100px 650px at 18% -8%, #FBF7EA, ${T.bg})` }}>
+      <div style={{ maxWidth: 540, margin: "0 auto", padding: "26px 18px 56px", position: "relative" }}>
+        <Starburst size={90} color="rgba(23,163,152,0.10)" style={{ position: "absolute", top: 90, right: -14 }} />
+        <Starburst size={54} color="rgba(216,67,63,0.09)" style={{ position: "absolute", top: 300, left: -8 }} />
+
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+            <Emblem size={48} />
+            <div>
+              <div style={{ fontFamily: display, fontSize: 26, fontWeight: 700, letterSpacing: "0.02em", lineHeight: 1 }}>
+                inert<span style={{ color: T.teal, textShadow: `0 0 10px ${T.tealGlow}` }}>.</span>
+              </div>
+              <div style={{ fontFamily: display, fontSize: 11, color: T.soft, marginTop: 4, fontWeight: 600, letterSpacing: "0.18em" }}>
+                beyond the label
+              </div>
+            </div>
+          </div>
+          <div style={{ ...recess(999), padding: 4, display: "flex", position: "relative", width: 108 }}>
+            <div style={{ position: "absolute", top: 4, bottom: 4, width: 50, borderRadius: 999,
+              left: region === "UK" ? 4 : 54,
+              background: "linear-gradient(150deg, #FFFEF8, #EDE7D6)",
+              boxShadow: "2px 2px 6px rgba(34,48,46,0.2), inset 0 1.5px 0 rgba(255,255,255,0.95)",
+              transition: "left 220ms cubic-bezier(.4,1.4,.6,1)" }} />
+            {["UK", "US"].map(r => (
+              <button key={r} onClick={() => setRegion(r)} style={{
+                flex: 1, position: "relative", zIndex: 1, border: "none", background: "transparent",
+                padding: "7px 0", fontFamily: display, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
+                cursor: "pointer", color: region === r ? T.ink : T.soft, transition: "color 200ms" }}>{r}</button>
+            ))}
+          </div>
+        </header>
+
+        {!result && (
+          <React.Fragment>
+            <div style={{ ...recess(999), padding: 5, display: "flex", position: "relative", marginBottom: 18 }}>
+              <div style={{ position: "absolute", top: 5, bottom: 5, width: "calc(50% - 7px)", borderRadius: 999,
+                left: mode === "photo" ? 5 : "calc(50% + 2px)",
+                background: "linear-gradient(150deg, #FFFEF8, #EDE7D6)",
+                boxShadow: "3px 3px 8px rgba(34,48,46,0.2), inset 0 1.5px 0 rgba(255,255,255,0.95)",
+                transition: "left 220ms cubic-bezier(.4,1.4,.6,1)" }} />
+              {[["photo", "UPLOAD"], ["qr", "QR"]].map(([m, label]) => (
+                <button key={m} onClick={() => { if (m === "photo") stopCamera(); setMode(m); setError(null); if (m === "qr") setImage(null); }}
+                  style={{ flex: 1, position: "relative", zIndex: 1, border: "none", background: "transparent",
+                    padding: "12px 0", fontFamily: display, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em",
+                    cursor: "pointer", color: mode === m ? T.ink : T.soft, transition: "color 200ms" }}>{label}</button>
+              ))}
+            </div>
+
+            <div style={{ ...raise(28), padding: 20, position: "relative" }}>
+              <div style={{ position: "absolute", top: 0, left: 28, right: 28, height: 4, borderRadius: "0 0 4px 4px", background: T.chrome, boxShadow: "0 1px 2px rgba(34,48,46,0.2)" }} />
+
+              {mode === "photo" ? (
+                <React.Fragment>
+                  {image ? (
+                    <div style={{ ...recess(18), padding: 8 }}>
+                      <img src={image.preview} alt="Product" style={{ width: "100%", maxHeight: 290, objectFit: "contain", borderRadius: 12, display: "block" }} />
+                    </div>
+                  ) : (
+                    <div style={{ padding: "32px 12px", textAlign: "center" }}>
+                      <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+                        <div style={{ position: "relative", width: 96, height: 96, borderRadius: "50%", ...recess(999),
+                          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {[0, 1, 2].map((i) => (
+                            <svg key={i} className="rise-chev" width="34" height="18" viewBox="0 0 34 18"
+                              style={{ position: "absolute", animation: `rise 1.8s ${i * 0.6}s cubic-bezier(.3,.6,.4,1) infinite`,
+                                filter: `drop-shadow(0 0 5px ${T.tealGlow})` }}>
+                              <path d="M3 15 L17 4 L31 15" fill="none" stroke={T.teal} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ))}
+                          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", pointerEvents: "none",
+                            background: "linear-gradient(150deg, rgba(255,255,255,0.55), transparent 45%)" }} />
+                        </div>
+                      </div>
+                      <div style={{ fontFamily: display, fontSize: 17, fontWeight: 700, letterSpacing: "0.12em" }}>POINT AT ANYTHING</div>
+                      <div style={{ fontSize: 13.5, color: T.soft, marginTop: 8, lineHeight: 1.6, maxWidth: 320, marginInline: "auto" }}>
+                        cookware, containers, utensils, glass, food or its label — barcodes included.
+                      </div>
+                    </div>
+                  )}
+                  <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: "none" }} />
+                  <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
+                  <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
+                    {!image ? (
+                      <React.Fragment>
+                        <Btn onClick={() => camRef.current?.click()} style={{ flex: 1 }}>take photo</Btn>
+                        <Btn onClick={() => fileRef.current?.click()} style={{ flex: 1 }}>photo library</Btn>
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <Btn onClick={() => fileRef.current?.click()} style={{ flex: 1 }}>change</Btn>
+                        <Btn primary onClick={() => analyse({})} disabled={loading} style={{ flex: 1.35 }}>
+                          {loading ? "analysing…" : "analyse"}
+                        </Btn>
+                      </React.Fragment>
+                    )}
+                  </div>
+                </React.Fragment>
+              ) : (
+                <React.Fragment>
+                  <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", aspectRatio: "4/3",
+                    background: "radial-gradient(120% 120% at 32% 22%, #12332F, #07120F 75%)",
+                    boxShadow: "inset 4px 4px 12px rgba(0,0,0,0.65), inset -2px -2px 8px rgba(255,255,255,0.05), 6px 6px 16px rgba(34,48,46,0.18)",
+                    border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: scanning ? "block" : "none" }} />
+                    {!scanning && (
+                      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                        <div style={{ position: "relative", width: 110, height: 110 }}>
+                          {[100, 68, 36].map((d) => (
+                            <div key={d} style={{ position: "absolute", inset: (110 - d) / 2, borderRadius: "50%", border: "1px solid rgba(23,163,152,0.35)" }} />
+                          ))}
+                          <div className="radar-sweep" style={{ position: "absolute", inset: 5, borderRadius: "50%",
+                            background: "conic-gradient(from 0deg, rgba(23,163,152,0.5), transparent 70deg)",
+                            animation: "radar 3s linear infinite" }} />
+                          <div style={{ position: "absolute", inset: "calc(50% - 3px)", width: 6, height: 6, borderRadius: "50%", background: T.teal, boxShadow: `0 0 10px ${T.tealGlow}` }} />
+                        </div>
+                        <div style={{ color: "#7BB8AE", fontSize: 13, letterSpacing: "0.08em", fontFamily: display, fontWeight: 600 }}>
+                          scanner on standby · barcodes + qr
+                        </div>
+                      </div>
+                    )}
+                    {scanning && (
+                      <div style={{ position: "absolute", inset: "16%", borderRadius: 18, border: "2px solid rgba(255,255,255,0.9)", boxShadow: `0 0 0 999px rgba(0,0,0,0.32), 0 0 20px ${T.tealGlow}` }} />
+                    )}
+                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(150deg, rgba(255,255,255,0.13), transparent 42%)" }} />
+                  </div>
+                  <canvas ref={canvasRef} style={{ display: "none" }} />
+                  <input ref={qrFileRef} type="file" accept="image/*" capture="environment" onChange={onQRFile} style={{ display: "none" }} />
+                  <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
+                    <Btn primary={!scanning} onClick={scanning ? stopCamera : startQR} style={{ flex: 1.2 }}>
+                      {scanning ? "stop scanner" : "start scanner"}
+                    </Btn>
+                    <Btn onClick={() => qrFileRef.current?.click()} disabled={loading} style={{ flex: 1 }}>
+                      snap the code
+                    </Btn>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.soft, marginTop: 11, textAlign: "center" }}>
+                    reads product barcodes and qr codes, matched against the open food facts database. scanner blocked? "snap the code" works from a photo.
+                  </div>
+                </React.Fragment>
+              )}
+
+              {loading && (
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <Atom mood="wary" size={78} />
+                  <div style={{ fontFamily: display, fontSize: 11.5, letterSpacing: "0.14em", color: T.soft, fontWeight: 700 }}>
+                    ATOM IS ON THE CASE…
+                  </div>
+                  {mode === "qr" && decoded && (
+                    <div style={{ fontSize: 11.5, color: T.soft }}>code · {decoded.slice(0, 36)}{decoded.length > 36 ? "…" : ""}</div>
+                  )}
+                </div>
+              )}
+              {error && (
+                <div style={{ ...recess(18), marginTop: 16, padding: "15px 17px", display: "flex", gap: 14, alignItems: "center" }}>
+                  <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "50%", background: T.chrome,
+                    boxShadow: "3px 3px 8px rgba(34,48,46,0.2), -2px -2px 6px rgba(255,255,255,0.9)",
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%",
+                      background: `radial-gradient(circle at 34% 30%, #ffd7d3, ${T.cherry} 55%)`,
+                      boxShadow: `0 0 14px ${T.cherryGlow}, inset 0 -2px 3px rgba(0,0,0,0.35), 0 1px 1px rgba(255,255,255,0.8)`,
+                      border: "1px solid rgba(34,48,46,0.3)" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: display, fontSize: 11, fontWeight: 800, letterSpacing: "0.24em", color: T.cherry, textShadow: `0 0 8px ${T.cherryGlow}`, marginBottom: 4 }}>
+                      MALFUNCTION
+                    </div>
+                    <div style={{ fontSize: 13, color: T.ink, lineHeight: 1.55 }}>{error}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </React.Fragment>
+        )}
+
+        {result && (
+          <div className="card-in" style={{ ...raise(28), overflow: "hidden", position: "relative" }}>
+            <div style={{ position: "absolute", top: 0, left: 28, right: 28, height: 4, borderRadius: "0 0 4px 4px", background: T.chrome, boxShadow: "0 1px 2px rgba(34,48,46,0.2)" }} />
+            <div style={{ padding: "30px 22px 8px", textAlign: "center" }}>
+              <div style={{ fontFamily: display, fontSize: 10.5, letterSpacing: "0.26em", color: T.soft, fontWeight: 700 }}>
+                {(result.category || "PRODUCT").toUpperCase()} · {region.toUpperCase()}
+              </div>
+              <h2 style={{ fontFamily: display, fontSize: 22, fontWeight: 700, letterSpacing: "0.01em", margin: "9px 0 24px" }}>{result.name}</h2>
+              {result.score != null && <Gauge score={result.score} />}
+              {result.verdict && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 14 }}>
+                  <Atom size={110} mood={result.verdict === "EXCELLENT" ? "joy" : result.verdict === "GOOD" ? "happy" : result.verdict === "CAUTION" ? "wary" : "drama"} />
+                  <div style={{ ...recess(999), display: "inline-flex", alignItems: "center", gap: 13, padding: "10px 18px", flexWrap: "wrap", justifyContent: "center" }}>
+                  {[["AVOID", T.cherry, T.cherryGlow], ["CAUTION", T.butter, T.butterGlow], ["GOOD", T.green, T.greenGlow], ["EXCELLENT", T.pine, T.pineGlow]].map(([v, c, g]) => (
+                    <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Jewel color={c} glow={g} on={result.verdict === v} size={11} breathe={result.verdict === v} />
+                      <span style={{ fontFamily: display, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em",
+                        color: result.verdict === v ? c : "#B4AE9E",
+                        textShadow: result.verdict === v ? `0 0 8px ${g}` : "none" }}>{v.toLowerCase()}</span>
+                    </span>
+                  ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="stagger" style={{ padding: "10px 22px 24px" }}>
+              <p style={{ fontSize: 14.5, lineHeight: 1.65, textAlign: "center", margin: "14px 0 20px" }}>{result.summary}</p>
+
+              {result.materials?.length > 0 && (
+                <Block label="ingredients">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
+                    {result.materials.map((m, i) => (
+                      <span key={i} style={{ ...recess(999), padding: "7px 15px", fontSize: 13, fontWeight: 600 }}>{m}</span>
+                    ))}
+                  </div>
+                </Block>
+              )}
+
+              {result.nutrition && (result.nutrition.protein_g != null || result.nutrition.sugar_g != null || result.nutrition.nutrients?.length > 0 || result.nutrition.artificial?.length > 0) && (
+                <Block label={`nutrition${result.nutrition.per ? " · " + result.nutrition.per : ""}`}>
+                  {(result.nutrition.protein_g != null || result.nutrition.sugar_g != null || result.nutrition.calories_kcal != null) && (
+                    <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                      {result.nutrition.calories_kcal != null && (
+                        <div style={{ ...recess(16), flex: 1, padding: "12px 10px", textAlign: "center" }}>
+                          <div style={{ fontFamily: display, fontSize: 21, fontWeight: 800, color: T.ink }}>{result.nutrition.calories_kcal}</div>
+                          <div style={{ fontFamily: display, fontSize: 9.5, letterSpacing: "0.2em", color: T.soft, fontWeight: 800, marginTop: 3 }}>KCAL</div>
+                        </div>
+                      )}
+                      {result.nutrition.protein_g != null && (
+                        <div style={{ ...recess(16), flex: 1, padding: "12px 10px", textAlign: "center" }}>
+                          <div style={{ fontFamily: display, fontSize: 21, fontWeight: 800, color: T.tealDeep }}>{result.nutrition.protein_g}g</div>
+                          <div style={{ fontFamily: display, fontSize: 9.5, letterSpacing: "0.2em", color: T.soft, fontWeight: 800, marginTop: 3 }}>PROTEIN</div>
+                        </div>
+                      )}
+                      {result.nutrition.sugar_g != null && (
+                        <div style={{ ...recess(16), flex: 1, padding: "12px 10px", textAlign: "center" }}>
+                          <div style={{ fontFamily: display, fontSize: 21, fontWeight: 800, color: result.nutrition.sugar_g > 10 ? T.cherry : result.nutrition.sugar_g > 5 ? T.butter : T.green }}>{result.nutrition.sugar_g}g</div>
+                          <div style={{ fontFamily: display, fontSize: 9.5, letterSpacing: "0.2em", color: T.soft, fontWeight: 800, marginTop: 3 }}>SUGAR</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {result.nutrition.nutrients?.length > 0 && result.nutrition.nutrients.map((n, i) => (
+                    <div key={i} style={{ marginBottom: 9 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700 }}>{n.name}</span>
+                        <span style={{ color: T.soft }}>{n.amount ? `${n.amount} · ` : ""}{n.rda_percent != null ? `${n.rda_percent}% daily` : ""}</span>
+                      </div>
+                      {n.rda_percent != null && (
+                        <div style={{ ...recess(999), height: 10, overflow: "hidden" }}>
+                          <div style={{
+                            width: `${Math.min(100, n.rda_percent)}%`, height: "100%", borderRadius: 999,
+                            background: `linear-gradient(90deg, #1FBFB2, ${T.tealDeep})`,
+                            boxShadow: `0 0 8px ${T.tealGlow}, inset 0 1px 0 rgba(255,255,255,0.35)`,
+                            transition: "width 700ms ease",
+                          }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {result.nutrition.artificial?.length > 0 && (
+                    <div style={{ ...recess(16), padding: "12px 15px", marginTop: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+                        <PulseDot color={T.cherry} glow={T.cherryGlow} speed={1.8} size={9} />
+                        <span style={{ fontFamily: display, fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", color: T.cherry }}>ARTIFICIAL · {result.nutrition.artificial.length}</span>
+                      </div>
+                      {result.nutrition.artificial.map((a, i) => (
+                        <div key={i} style={{ fontSize: 12.5, color: T.ink, lineHeight: 1.7 }}>· {a}</div>
+                      ))}
+                    </div>
+                  )}
+                </Block>
+              )}
+
+              <Block label="detected hazards">
+                {result.hazards?.length ? result.hazards.map((h, i) => {
+                  const s = sev[h.severity] || sev.low;
+                  return (
+                    <div key={i} style={{ ...recess(16), padding: "13px 15px", marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <strong style={{ fontSize: 14 }}>{h.name}</strong>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                          <PulseDot color={s.color} glow={s.glow} speed={s.speed} size={9} />
+                          <span style={{ fontFamily: display, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.16em", color: s.color }}>{s.label}</span>
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: T.soft, marginTop: 5, lineHeight: 1.55 }}>{h.detail}</div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14, color: T.tealDeep, fontWeight: 700 }}>
+                    <Jewel color={T.teal} glow={T.tealGlow} size={11} /> nothing detected — clean.
+                  </div>
+                )}
+              </Block>
+
+              {result.goodParts?.length > 0 && (
+                <Block label="what's natural here">
+                  {result.goodParts.map((g, i) => (
+                    <div key={i} style={{ fontSize: 13.5, lineHeight: 1.8, color: T.tealDeep, fontWeight: 600 }}>✦ {g}</div>
+                  ))}
+                </Block>
+              )}
+
+              {result.swap && (
+                <div style={{ marginTop: 20, borderRadius: 20, padding: "16px 18px", color: "#EFF7F0", position: "relative", overflow: "hidden",
+                  background: "linear-gradient(160deg, #14403A, #0A211D)",
+                  boxShadow: "6px 6px 16px rgba(34,48,46,0.25), inset 0 1.5px 0 rgba(255,255,255,0.08)" }}>
+                  <Starburst size={70} color="rgba(23,163,152,0.18)" style={{ position: "absolute", right: -12, top: -12 }} />
+                  <div style={{ fontFamily: display, fontSize: 10, letterSpacing: "0.26em", color: "#6FD8C4", fontWeight: 800, marginBottom: 7, textShadow: `0 0 8px ${T.tealGlow}` }}>THE SWAP</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.55 }}>{result.swap}</div>
+                </div>
+              )}
+
+              {result.homemade && (
+                <div style={{ marginTop: 14, borderRadius: 20, padding: "16px 18px", position: "relative", overflow: "hidden",
+                  background: "linear-gradient(160deg, #F6EEDC, #EFE3C8)",
+                  boxShadow: "6px 6px 16px rgba(34,48,46,0.14), inset 0 1.5px 0 rgba(255,255,255,0.85)",
+                  border: "1px solid rgba(255,255,255,0.6)" }}>
+                  <Starburst size={64} color="rgba(224,138,30,0.18)" style={{ position: "absolute", right: -10, top: -10 }} />
+                  <div style={{ fontFamily: display, fontSize: 10, letterSpacing: "0.26em", color: "#A8741B", fontWeight: 800, marginBottom: 7 }}>MAKE IT YOURSELF</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: T.ink }}>{result.homemade}</div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
+                <Btn primary onClick={shareCard} style={{ flex: 1 }}>share the verdict</Btn>
+                <Btn onClick={reset} style={{ flex: 1 }}>scan another</Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <footer style={{ textAlign: "center", marginTop: 24, fontSize: 11.5, color: T.soft, lineHeight: 1.6 }}>
+          inert. gives a naturalist's opinion — not medical or food-safety advice.
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Inert />);
+</script>
+</body>
+</html>
